@@ -26,6 +26,11 @@ public partial class PseudoConsole : IDisposable
     public Stream? Reader => _reader;
 
     /// <summary>
+    /// Gets the OS process id (PID) of the associated child process, or 0 if not started.
+    /// </summary>
+    public int ProcessId => _process is null ? 0 : _process.Id;
+
+    /// <summary>
     /// Initializes a new <see cref="PseudoConsole"/>.
     /// </summary>
     /// <param name="pseudoConsoleHandle">ConPTY handle.</param>

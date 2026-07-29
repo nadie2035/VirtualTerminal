@@ -19,6 +19,11 @@
             Gets the underlying ConPTY wrapper (process + pipes).
             </summary>
         </member>
+        <member name="P:VirtualTerminal.CommandLineSession.ProcessId">
+            <summary>
+            Gets the OS process id (PID) of the associated child process, or 0 if not started.
+            </summary>
+        </member>
         <member name="M:VirtualTerminal.CommandLineSession.#ctor(VirtualTerminal.Interop.ProcessCreationInfo)">
             <summary>
             Starts a ConPTY session running the provided command line.
@@ -58,6 +63,11 @@
         <member name="P:VirtualTerminal.Interop.PseudoConsole.Reader">
             <summary>
             Reader stream, that receives data from child process' STD_OUTPUT
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Interop.PseudoConsole.ProcessId">
+            <summary>
+            Gets the OS process id (PID) of the associated child process, or 0 if not started.
             </summary>
         </member>
         <member name="M:VirtualTerminal.Interop.PseudoConsole.#ctor(System.IntPtr,VirtualTerminal.Interop.Win32Process,System.IO.Stream,System.IO.Stream)">
@@ -177,11 +187,17 @@
             Gets the underlying process handle.
             </summary>
         </member>
-        <member name="M:VirtualTerminal.Interop.Win32Process.#ctor(System.IntPtr)">
+        <member name="P:VirtualTerminal.Interop.Win32Process.Id">
+            <summary>
+            Gets the OS process id (PID) returned by <c>CreateProcess</c>.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32Process.#ctor(System.IntPtr,System.Int32)">
             <summary>
             Initializes a new <see cref="T:VirtualTerminal.Interop.Win32Process"/> wrapper for the specified process handle.
             </summary>
             <param name="handle">Process handle.</param>
+            <param name="processId">Process id from <c>PROCESS_INFORMATION.dwProcessId</c>.</param>
             <exception cref="T:System.InvalidOperationException">Thrown if the handle is invalid.</exception>
         </member>
         <member name="M:VirtualTerminal.Interop.Win32Process.Finalize">

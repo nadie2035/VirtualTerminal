@@ -9,24 +9,32 @@ namespace VirtualTerminal.Interop;
 public partial class Win32Process : IDisposable
 {
     private IntPtr _handle;
+    private readonly int _processId;
     private bool _disposed;
 
     /// <summary>
     /// Gets the underlying process handle.
     /// </summary>
     public IntPtr Handle => _handle;
-    
+
+    /// <summary>
+    /// Gets the OS process id (PID) returned by <c>CreateProcess</c>.
+    /// </summary>
+    public int Id => _processId;
+
     /// <summary>
     /// Initializes a new <see cref="Win32Process"/> wrapper for the specified process handle.
     /// </summary>
     /// <param name="handle">Process handle.</param>
+    /// <param name="processId">Process id from <c>PROCESS_INFORMATION.dwProcessId</c>.</param>
     /// <exception cref="InvalidOperationException">Thrown if the handle is invalid.</exception>
-    public Win32Process(IntPtr handle)
+    public Win32Process(IntPtr handle, int processId)
     {
         if (NativeMethods.IsInvalidHandleValue(handle))
             throw new InvalidOperationException("Process handle was invalid");
 
         _handle = handle;
+        _processId = processId;
     }
 
     /// <summary>

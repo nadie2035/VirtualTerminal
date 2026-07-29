@@ -924,7 +924,6 @@ public partial class TerminalControl : Control, IDisposable
     protected override void OnPreviewMouseWheel(MouseWheelEventArgs e)
     {
         base.OnPreviewMouseWheel(e);
-        Debug.WriteLine($"[{GetType().Name}] OnPreviewMouseWheel: delta={e.Delta}, decoder={_decoder is not null}");
         if (_decoder is null || e.Handled)
             return;
 
@@ -938,14 +937,43 @@ public partial class TerminalControl : Control, IDisposable
         if (direction == 0)
             return;
 
-        // When the app tracks the mouse, the wheel scrolls its content (e.g. claude's
-        // conversation) instead of the local scrollback.
-        if (ShouldForwardToApp(IsMouseReporting(), modifiers))
+        // Decide whether the wheel belongs to the application or to the local scrollback.
+        //  - When the app has enabled xterm mouse reporting (DECSET 1000/1002/1003) the
+        //    wheel scrolls its content (e.g. a TUI's conversation) instead of the local
+        //    scrollback. This is the direct-decoding path (SSH/non-ConPTY sessions).
+        //  - Under ConPTY the decoder never sees the app's mouse modes: ConPTY is itself a
+        //    terminal emulator in the middle and consumes them, so IsMouseReporting() stays
+        //    false even when the app tracks the mouse. A fullscreen TUI (claude, codex) that
+        //    repaints in place leaves the local scrollback empty, so "no scrollback to
+        //    navigate" is the signal that the app owns the screen and the wheel must be
+        //    forwarded to ConPTY, which routes it to the app when it tracks the mouse.
+        //  - A plain shell scrolls with line feeds and accumulates scrollback, so the wheel
+        //    navigates that local history.
+        // Note: forwarding only reaches the app on ConPTY builds that relay mouse input
+        // (Windows 11). On Windows 10 ConPTY drops the reports, so a fullscreen TUI there
+        // simply does not react to the wheel; nothing else misbehaves.
+        bool appTracksMouse = IsMouseReporting();
+        bool hasLocalScrollback = _decoder.Buffer.ScrollbackCount > 0;
+
+        // Shift bypasses forwarding (xterm/Windows Terminal behavior): holding Shift keeps
+        // the local selection/scrollback so the user can still copy text from a TUI that
+        // owns the mouse.
+        bool shift = (modifiers & ModifierKeys.Shift) != 0;
+        bool forwardToApp = !shift && (appTracksMouse || !hasLocalScrollback);
+
+        if (forwardToApp)
         {
             Point cell = GetCellPosition(e);
             if (cell.X >= 0)
+            {
+                // SGR (1006) is the modern default and the encoding ConPTY translates on its
+                // input pipe. When the decoder has seen the app pick legacy encoding (direct
+                // decode path), honor that; otherwise default to SGR for the ConPTY path.
+                bool sgr = appTracksMouse ? _decoder.State.Modes.SgrMouseEncoding : true;
                 Session?.Append(MouseEncoder.EncodeWheel(up: direction > 0, (int)cell.X, (int)cell.Y,
-                    ToTerminalModifier(modifiers), _decoder.State.Modes.SgrMouseEncoding));
+                    ToTerminalModifier(modifiers), sgr));
+            }
+
             e.Handled = true;
             return;
         }

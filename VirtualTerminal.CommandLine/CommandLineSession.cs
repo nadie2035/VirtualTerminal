@@ -30,6 +30,11 @@ public sealed class CommandLineSession : TerminalSession
     public PseudoConsole PseudoConsole => pseudoConsole;
 
     /// <summary>
+    /// Gets the OS process id (PID) of the associated child process, or 0 if not started.
+    /// </summary>
+    public int ProcessId => pseudoConsole?.ProcessId ?? 0;
+
+    /// <summary>
     /// Starts a ConPTY session running the provided command line.
     /// </summary>
     /// <param name="process"></param>

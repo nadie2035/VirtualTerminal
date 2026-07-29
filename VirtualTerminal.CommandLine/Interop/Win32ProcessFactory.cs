@@ -69,7 +69,7 @@ public static partial class Win32ProcessFactory
             throw new Win32Exception(Marshal.GetLastWin32Error(), $"Failed to create process: {info.ApplicationName}");
 
         NativeMethods.CloseHandle(ProcInfo.hThread);
-        return new Win32Process(ProcInfo.hProcess);
+        return new Win32Process(ProcInfo.hProcess, ProcInfo.dwProcessId);
     }
 
     /*
