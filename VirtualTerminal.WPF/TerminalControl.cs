@@ -649,15 +649,50 @@ public partial class TerminalControl : Control, IDisposable
         if (_scrollOffset > 0)
             ScrollToBottom();
 
+        if (TrySendKeyToSession(key, mods))
+        {
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Manda a la sesion la pulsacion indicada (secuencia xterm de tecla especial o
+    /// meta ESC+caracter) sin pasar por el foco del control. Devuelve <c>true</c> si
+    /// se envio algo. Ademas del teclado propio lo usa quien tiene el foco en otro
+    /// control y quiere que una combinacion concreta llegue al terminal (el edit de
+    /// inyeccion reenvia asi los atajos con Alt).
+    /// </summary>
+    public bool TrySendKeyToSession(Key key, ModifierKeys modifiers)
+    {
+        if (_decoder is null || Session is null)
+            return false;
+
         TerminalKey terminalKey = ToTerminalKey(key);
-        TerminalModifier terminalMods = ToTerminalModifier(mods);
+        TerminalModifier terminalMods = ToTerminalModifier(modifiers);
 
         string? keySequence = KeyboardEncoder.Encode(terminalKey, terminalMods, in _decoder.State.Modes);
         if (keySequence is not null)
         {
-            Session?.Append(keySequence);
-            e.Handled = true;
-            return;
+            Session.Append(keySequence);
+            return true;
+        }
+
+        // Ctrl + letra: un terminal lo manda como caracter de control C0 (Ctrl+A =
+        // 0x01 ... Ctrl+Z = 0x1A). Es como reciben sus atajos las TUI (Ctrl+B de
+        // claude abre sus tareas en curso) y como se interrumpe un proceso
+        // (Ctrl+C = 0x03). El encoder no lo cubre: solo codifica teclas especiales,
+        // y las letras tampoco llegan por la via del texto, porque WPF entrega el
+        // caracter de control en TextComposition.ControlText y no en .Text, que es
+        // lo unico que mira OnPreviewTextInput. Sin esto, Ctrl+<letra> se pierde
+        // entero. Se excluye Ctrl+Alt: en los layouts europeos es AltGr y produce
+        // caracteres normales (@, #, []), que van por la via del texto.
+        bool controlWithoutAlt = (modifiers & ModifierKeys.Control) != 0
+            && (modifiers & ModifierKeys.Alt) == 0
+            && !KeyHelper.IsRightAltPressed();
+        if (controlWithoutAlt && key is >= Key.A and <= Key.Z)
+        {
+            Session.Append(((char)(key - Key.A + 1)).ToString());
+            return true;
         }
 
         // Alt izquierdo + caracter imprimible: WPF NO dispara TextInput con Alt
@@ -667,18 +702,20 @@ public partial class TerminalControl : Control, IDisposable
         // reporta como Ctrl+Alt): ese SI produce TextInput con el caracter
         // alternativo (p. ej. AltGr+2 = @) y ya lo envia OnPreviewTextInput, asi
         // que aqui no se toca. Tambien se excluyen Alt+Ctrl (no es meta puro).
-        bool leftAlt = (mods & ModifierKeys.Alt) != 0
-            && (mods & ModifierKeys.Control) == 0
+        bool leftAlt = (modifiers & ModifierKeys.Alt) != 0
+            && (modifiers & ModifierKeys.Control) == 0
             && !KeyHelper.IsRightAltPressed();
         if (leftAlt && !KeyHelper.IsModifier(key))
         {
             string? ch = KeyHelper.GetCharFromKey(key, ignoreAlt: true);
             if (!string.IsNullOrEmpty(ch))
             {
-                Session?.Append("\x1b" + ch);
-                e.Handled = true;
+                Session.Append("\x1b" + ch);
+                return true;
             }
         }
+
+        return false;
     }
 
     /// <inheritdoc />

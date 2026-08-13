@@ -449,6 +449,15 @@
         <member name="M:VirtualTerminal.TerminalControl.OnPreviewKeyDown(System.Windows.Input.KeyEventArgs)">
             <inheritdoc />
         </member>
+        <member name="M:VirtualTerminal.TerminalControl.TrySendKeyToSession(System.Windows.Input.Key,System.Windows.Input.ModifierKeys)">
+            <summary>
+            Manda a la sesion la pulsacion indicada (secuencia xterm de tecla especial o
+            meta ESC+caracter) sin pasar por el foco del control. Devuelve <c>true</c> si
+            se envio algo. Ademas del teclado propio lo usa quien tiene el foco en otro
+            control y quiere que una combinacion concreta llegue al terminal (el edit de
+            inyeccion reenvia asi los atajos con Alt).
+            </summary>
+        </member>
         <member name="M:VirtualTerminal.TerminalControl.OnPreviewTextInput(System.Windows.Input.TextCompositionEventArgs)">
             <inheritdoc />
         </member>
