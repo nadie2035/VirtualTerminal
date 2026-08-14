@@ -109,14 +109,29 @@ public partial class Win32HandleStream : Stream
         if (!CanWrite)
             throw new NotSupportedException("Stream does not support writing.");
 
-        bool success = NativeMethods.WriteFile(
-            _handle, buffer, (uint)buffer.Length,
-            out _, IntPtr.Zero);
-
-        if (!success)
+        // WriteFile may consume fewer bytes than asked for, so the rest has to be
+        // written again: dropping it would silently lose part of the input the
+        // caller sent (long injected prompts hit this).
+        int bytesLeftToWrite = buffer.Length;
+        while (bytesLeftToWrite > 0)
         {
-            int error = Marshal.GetLastWin32Error();
-            throw new Win32Exception(error, "WriteFile failed");
+            ReadOnlySpan<byte> pending = buffer[^bytesLeftToWrite..];
+            bool success = NativeMethods.WriteFile(
+                _handle, pending, (uint)pending.Length,
+                out uint bytesWritten, IntPtr.Zero);
+
+            if (!success)
+            {
+                int error = Marshal.GetLastWin32Error();
+                throw new Win32Exception(error, "WriteFile failed");
+            }
+
+            if (bytesWritten == 0)
+            {
+                throw new IOException("WriteFile reported no progress writing to the pipe.");
+            }
+
+            bytesLeftToWrite -= (int)bytesWritten;
         }
     }
 
