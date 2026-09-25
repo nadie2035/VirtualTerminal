@@ -59,7 +59,8 @@ public static partial class Win32ProcessFactory
             ref lpProcessAttributes,
             ref lpThreadAttributes,
             false,
-            ProcessCreationFlag.EXTENDED_STARTUPINFO_PRESENT,
+            ProcessCreationFlag.EXTENDED_STARTUPINFO_PRESENT
+                | (info.Environment is null ? 0 : ProcessCreationFlag.CREATE_UNICODE_ENVIRONMENT),
             info.Environment,
             info.CurrentDirectory,
             ref startupInfo,

@@ -156,3 +156,5 @@ All VT-compatible output from the tool will be rendered in the `TerminalControl`
 - **Windows-only**: ConPTY is available on modern Windows 10/11; the project targets `net10.0-windows`.
 - **Encoding**: `CommandLineSession` uses UTF-8 by default.
 - **Resizing**: the control debounces rapid resize events and suppresses intermediate renders so ConPTY can produce a clean reflow frame. A minimum grid size of 10×3 is enforced to prevent shells from resetting at extremely small window sizes.
+
+An explicit ProcessCreationInfo.Environment is a UTF-16 environment block (NAME=value entries separated by NUL, ending in two NUL characters). Win32ProcessFactory sets CREATE_UNICODE_ENVIRONMENT when this block is supplied; null inherits the parent environment.
