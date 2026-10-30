@@ -4,6 +4,12 @@
         <name>VirtualTerminal.CommandLine</name>
     </assembly>
     <members>
+        <member name="T:VirtualTerminal.RawOutputHandler">
+            <summary>
+            Handler for <see cref="E:VirtualTerminal.CommandLineSession.RawOutputReceived"/>.
+            </summary>
+            <param name="data">Bytes just read from the ConPTY.</param>
+        </member>
         <member name="T:VirtualTerminal.CommandLineSession">
             <summary>
             A <see cref="T:VirtualTerminal.Session.TerminalSession"/> implementation backed by Windows ConPTY (pseudo console).
@@ -17,6 +23,20 @@
         <member name="P:VirtualTerminal.CommandLineSession.PseudoConsole">
             <summary>
             Gets the underlying ConPTY wrapper (process + pipes).
+            </summary>
+        </member>
+        <member name="E:VirtualTerminal.CommandLineSession.RawOutputReceived">
+            <summary>
+            Raised with every chunk of bytes read from the ConPTY, right after it was fed to the decoder.
+            It runs on the read thread while the decoder lock (<c>Decoder.Buffer.SyncRoot</c>) is held, so a
+            subscriber that takes a screen snapshot under that same lock sees snapshot and stream in order.
+            Handlers must be quick and must not keep the span.
+            </summary>
+        </member>
+        <member name="E:VirtualTerminal.CommandLineSession.Resized">
+            <summary>
+            Raised when the grid is resized (columns, rows), under the decoder lock and before the ConPTY is told,
+            so it is ordered before the repaint output the new size provokes.
             </summary>
         </member>
         <member name="P:VirtualTerminal.CommandLineSession.ProcessId">

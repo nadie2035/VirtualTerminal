@@ -8,6 +8,12 @@ using VirtualTerminal.Session;
 namespace VirtualTerminal;
 
 /// <summary>
+/// Handler for <see cref="CommandLineSession.RawOutputReceived"/>.
+/// </summary>
+/// <param name="data">Bytes just read from the ConPTY.</param>
+public delegate void RawOutputHandler(ReadOnlySpan<byte> data);
+
+/// <summary>
 /// A <see cref="TerminalSession"/> implementation backed by Windows ConPTY (pseudo console).
 /// It starts a child process attached to a pseudoconsole and forwards IO between the process and
 /// the session <see cref="TerminalSession.Buffer"/>.
@@ -28,6 +34,20 @@ public sealed class CommandLineSession : TerminalSession
     /// Gets the underlying ConPTY wrapper (process + pipes).
     /// </summary>
     public PseudoConsole PseudoConsole => pseudoConsole;
+
+    /// <summary>
+    /// Raised with every chunk of bytes read from the ConPTY, right after it was fed to the decoder.
+    /// It runs on the read thread while the decoder lock (<c>Decoder.Buffer.SyncRoot</c>) is held, so a
+    /// subscriber that takes a screen snapshot under that same lock sees snapshot and stream in order.
+    /// Handlers must be quick and must not keep the span.
+    /// </summary>
+    public event RawOutputHandler? RawOutputReceived;
+
+    /// <summary>
+    /// Raised when the grid is resized (columns, rows), under the decoder lock and before the ConPTY is told,
+    /// so it is ordered before the repaint output the new size provokes.
+    /// </summary>
+    public event Action<ushort, ushort>? Resized;
 
     /// <summary>
     /// Gets the OS process id (PID) of the associated child process, or 0 if not started.
@@ -77,7 +97,14 @@ public sealed class CommandLineSession : TerminalSession
         // For ConPTY we let the pseudo-console own reflow. Resize only the local buffer
         // geometry without moving rows into scrollback; ConPTY will repaint/overwrite
         // the visible area itself, so avoid a full clear that causes blank-frame flicker.
-        base.Resize(columns, rows, pushScrollback: false);
+        // The lock only covers the local grid and the notification; the ConPTY resize stays outside
+        // because it can block while conhost waits for the read loop, which needs this same lock.
+        lock (InternalDecoder.Buffer.SyncRoot)
+        {
+            base.Resize(columns, rows, pushScrollback: false);
+            Resized?.Invoke(columns, rows);
+        }
+
         PseudoConsole.Resize(columns, rows);
     }
 
@@ -100,7 +127,12 @@ public sealed class CommandLineSession : TerminalSession
                         break;
 
                     ReadOnlySpan<byte> readed = data.Slice(0, bytesRead);
-                    Decoder.WriteFromEncoding(InputEncoding, readed);
+                    lock (InternalDecoder.Buffer.SyncRoot)
+                    {
+                        Decoder.WriteFromEncoding(InputEncoding, readed);
+                        RawOutputReceived?.Invoke(readed);
+                    }
+
                     NotifyBufferUpdated();
                 }
                 catch (Exception exc)

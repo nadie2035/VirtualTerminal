@@ -158,3 +158,10 @@ All VT-compatible output from the tool will be rendered in the `TerminalControl`
 - **Resizing**: the control debounces rapid resize events and suppresses intermediate renders so ConPTY can produce a clean reflow frame. A minimum grid size of 10×3 is enforced to prevent shells from resetting at extremely small window sizes.
 
 An explicit ProcessCreationInfo.Environment is a UTF-16 environment block (NAME=value entries separated by NUL, ending in two NUL characters). Win32ProcessFactory sets CREATE_UNICODE_ENVIRONMENT when this block is supplied; null inherits the parent environment.
+
+---
+
+## Local changes (poldev fork)
+
+- `CommandLineSession.RawOutputReceived`: raised with every chunk read from the ConPTY, on the read thread and under the decoder lock (`Decoder.Buffer.SyncRoot`), right after the chunk was fed to the decoder. It lets a host mirror the session to another terminal: a snapshot taken under the same lock and the chunks that follow it are consecutive.
+- `CommandLineSession.Resized`: raised (columns, rows) from `Resize`, under the same lock and before the ConPTY is resized, so it is ordered before the repaint output the new size provokes.
