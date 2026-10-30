@@ -440,6 +440,12 @@
         <member name="M:VirtualTerminal.TerminalControl.OnRenderSizeChanged(System.Windows.SizeChangedInfo)">
             <inheritdoc />
         </member>
+        <member name="M:VirtualTerminal.TerminalControl.FitSessionToBounds">
+            <summary>
+            Fits the session grid to the control's current area right now, without waiting for a layout change.
+            A host that let another party resize a shared session calls this to take the local size back.
+            </summary>
+        </member>
         <member name="M:VirtualTerminal.TerminalControl.OnGotKeyboardFocus(System.Windows.Input.KeyboardFocusChangedEventArgs)">
             <inheritdoc />
         </member>

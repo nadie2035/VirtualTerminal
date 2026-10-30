@@ -541,6 +541,12 @@ public partial class TerminalControl : Control, IDisposable
         _resizeTimer.Start();
     }
 
+    /// <summary>
+    /// Fits the session grid to the control's current area right now, without waiting for a layout change.
+    /// A host that let another party resize a shared session calls this to take the local size back.
+    /// </summary>
+    public void FitSessionToBounds() => ResizeSessionToBounds();
+
     private void ResizeSessionToBounds()
     {
         Size renderSize = RenderSize;

@@ -165,3 +165,4 @@ An explicit ProcessCreationInfo.Environment is a UTF-16 environment block (NAME=
 
 - `CommandLineSession.RawOutputReceived`: raised with every chunk read from the ConPTY, on the read thread and under the decoder lock (`Decoder.Buffer.SyncRoot`), right after the chunk was fed to the decoder. It lets a host mirror the session to another terminal: a snapshot taken under the same lock and the chunks that follow it are consecutive.
 - `CommandLineSession.Resized`: raised (columns, rows) from `Resize`, under the same lock and before the ConPTY is resized, so it is ordered before the repaint output the new size provokes.
+- `TerminalControl.FitSessionToBounds()` (in `VirtualTerminal.WPF/TerminalControl.cs`): public wrapper over the private fit-to-area step, so a host that let another party resize a shared session can take the local size back without waiting for a layout change.
