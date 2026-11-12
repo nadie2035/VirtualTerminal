@@ -107,6 +107,9 @@
         <member name="F:VirtualTerminal.Buffer.TerminalModes.BackspaceSendsControlH">
             <summary>DEC private ?67 — backspace sends 0x08 instead of 0x7F.</summary>
         </member>
+        <member name="F:VirtualTerminal.Buffer.TerminalModes.LeftRightMarginMode">
+            <summary>DEC private ?69 (DECLRMM): left and right margin mode.</summary>
+        </member>
         <member name="F:VirtualTerminal.Buffer.TerminalModes.LineFeedNewLine">
             <summary>ANSI 20 (LNM) — line feed/new line mode: Enter sends CR+LF, LF does CR+LF.</summary>
         </member>
@@ -218,6 +221,12 @@
         <member name="P:VirtualTerminal.Buffer.TerminalScreenBuffer.ScrollBottom">
             <summary>Gets the bottom row of the current scroll region (inclusive).</summary>
         </member>
+        <member name="P:VirtualTerminal.Buffer.TerminalScreenBuffer.ScrollLeft">
+            <summary>Left column of the horizontal scroll region, inclusive.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Buffer.TerminalScreenBuffer.ScrollRight">
+            <summary>Right column of the horizontal scroll region, inclusive.</summary>
+        </member>
         <member name="P:VirtualTerminal.Buffer.TerminalScreenBuffer.IsAlternate">
             <summary>Gets a value indicating whether the alternate screen is active.</summary>
         </member>
@@ -318,6 +327,12 @@
         </member>
         <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.ResetScrollRegion">
             <summary>Resets the scroll region to cover the entire screen.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.SetHorizontalScrollRegion(System.Int32,System.Int32)">
+            <summary>Sets the inclusive horizontal scroll region.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.ResetHorizontalScrollRegion">
+            <summary>Resets horizontal margins to the full line.</summary>
         </member>
         <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.ScrollUp(System.Int32)">
             <summary>Scrolls the current scroll region up by <paramref name="n"/> (content moves up).</summary>

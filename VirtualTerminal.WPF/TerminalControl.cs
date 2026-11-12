@@ -992,9 +992,9 @@ public partial class TerminalControl : Control, IDisposable
         //    forwarded to ConPTY, which routes it to the app when it tracks the mouse.
         //  - A plain shell scrolls with line feeds and accumulates scrollback, so the wheel
         //    navigates that local history.
-        // Note: forwarding only reaches the app on ConPTY builds that relay mouse input
-        // (Windows 11). On Windows 10 ConPTY drops the reports, so a fullscreen TUI there
-        // simply does not react to the wheel; nothing else misbehaves.
+        // Mouse forwarding needs a recent ConPTY host. poldev bundles OpenConsole
+        // for Windows 10 too; consumers using the old inbox Windows 10 host still
+        // cannot forward these reports.
         bool appTracksMouse = IsMouseReporting();
         bool hasLocalScrollback = _decoder.Buffer.ScrollbackCount > 0;
 

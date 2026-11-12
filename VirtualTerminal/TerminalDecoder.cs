@@ -340,7 +340,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                     EraseLine(parameters.At(0, 0));
                     break;             // EL
                 case 'X':
-                    Buffer.EraseChars(State.CursorY, State.CursorX, Math.Max(1, parameters.At(0, 1)));
+                    EraseCellsWithBackground(State.CursorY, State.CursorX, Math.Max(1, parameters.At(0, 1)));
                     break; // ECH
 
                 // ---- Insert / delete ----
@@ -378,7 +378,10 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
                 // ---- Save / restore (ANSI) ----
                 case 's':
-                    State.SaveCursor();
+                    if (State.Modes.LeftRightMarginMode)
+                        SetHorizontalScrollRegion(parameters.At(0, 1), parameters.At(1, Buffer.Columns));
+                    else
+                        State.SaveCursor();
                     break;
                 case 'u':
                     State.RestoreCursor();
@@ -411,7 +414,11 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
                 // ---- SGR ----
                 case 'm':
-                    SetGraphicRendition(parameters);
+                    // Only unprefixed CSI ... m is SGR. Xterm's CSI >4;2m
+                    // configures keyboard reporting; treating it as SGR enables
+                    // underline on all subsequently printed cells, including spaces.
+                    if (privateMarker == '\0' && intermediates.IsEmpty)
+                        SetGraphicRendition(parameters);
                     break;
 
                 default:
@@ -521,21 +528,37 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
     private void CursorHorizontal(int delta)
     {
+        int limit = delta < 0
+            ? (State.Modes.LeftRightMarginMode && State.CursorX >= Buffer.ScrollLeft ? Buffer.ScrollLeft : 0)
+            : (State.Modes.LeftRightMarginMode && State.CursorX <= Buffer.ScrollRight ? Buffer.ScrollRight : Buffer.Columns - 1);
+
         State.CursorX = Math.Clamp(State.CursorX + delta, 0, Buffer.Columns - 1);
+        if (delta < 0 && State.CursorX < limit)
+            State.CursorX = limit;
+
+        if (delta > 0 && State.CursorX > limit)
+            State.CursorX = limit;
+
         State.WrapPending = false;
     }
 
     private void CursorLine(int count, int dir)
     {
         count = Math.Max(1, count);
-        State.CursorY = Math.Clamp(State.CursorY + dir * count, 0, Buffer.Rows - 1);
-        State.CursorX = 0;
+        int minY = State.Modes.OriginMode ? Buffer.ScrollTop : 0;
+        int maxY = State.Modes.OriginMode ? Buffer.ScrollBottom : Buffer.Rows - 1;
+        State.CursorY = Math.Clamp(State.CursorY + dir * count, minY, maxY);
+        State.CursorX = State.Modes.OriginMode ? Buffer.ScrollLeft : 0;
         State.WrapPending = false;
     }
 
     private void CursorToColumn(int column)
     {
-        State.CursorX = Math.Clamp(column - 1, 0, Buffer.Columns - 1);
+        int target = State.Modes.OriginMode
+            ? Buffer.ScrollLeft + column - 1 : column - 1;
+        int minX = State.Modes.OriginMode ? Buffer.ScrollLeft : 0;
+        int maxX = State.Modes.OriginMode ? Buffer.ScrollRight : Buffer.Columns - 1;
+        State.CursorX = Math.Clamp(target, minX, maxX);
         State.WrapPending = false;
     }
 
@@ -543,8 +566,9 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     {
         int target = State.Modes.OriginMode
             ? Buffer.ScrollTop + row - 1 : row - 1;
-
-        State.CursorY = Math.Clamp(target, 0, Buffer.Rows - 1);
+        int minY = State.Modes.OriginMode ? Buffer.ScrollTop : 0;
+        int maxY = State.Modes.OriginMode ? Buffer.ScrollBottom : Buffer.Rows - 1;
+        State.CursorY = Math.Clamp(target, minY, maxY);
         State.WrapPending = false;
     }
 
@@ -553,13 +577,44 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         int y = State.Modes.OriginMode
             ? Buffer.ScrollTop + row - 1 : row - 1;
 
-        int x = col - 1;
-        State.CursorY = Math.Clamp(y, 0, Buffer.Rows - 1);
-        State.CursorX = Math.Clamp(x, 0, Buffer.Columns - 1);
+        int x = State.Modes.OriginMode
+            ? Buffer.ScrollLeft + col - 1 : col - 1;
+
+        int minY = State.Modes.OriginMode ? Buffer.ScrollTop : 0;
+        int maxY = State.Modes.OriginMode ? Buffer.ScrollBottom : Buffer.Rows - 1;
+        int minX = State.Modes.OriginMode ? Buffer.ScrollLeft : 0;
+        int maxX = State.Modes.OriginMode ? Buffer.ScrollRight : Buffer.Columns - 1;
+
+        State.CursorY = Math.Clamp(y, minY, maxY);
+        State.CursorX = Math.Clamp(x, minX, maxX);
         State.WrapPending = false;
     }
 
     // ============== Erase / insert / delete ==============
+
+    // ED/EL/ECH erase with the current background (BCE), not the terminal's
+    // default black. Do not carry inverse, underline or wide-cell flags to blanks.
+    private void EraseCellsWithBackground(int row, int column, int count)
+    {
+        CellRenderStyle current = State.Attributes.ToCellStyle(Options.Palette, Options.BoldAsBright);
+        CellRenderStyle blankStyle = CellRenderStyle.Default with
+        {
+            Background = current.Background,
+            Flags = current.BackgroundIsDefault
+                ? CellRenderStyle.Default.Flags
+                : CellRenderStyle.Default.Flags & ~CellStyleFlags.BackgroundIsDefault
+        };
+        int length = Math.Min(count, Buffer.Columns - column);
+        Buffer.GetRow(row).Slice(column, length).Fill(new TerminalCellInfo(new Rune(' '), blankStyle));
+        Buffer.MarkRowDirty(row);
+    }
+
+    private void EraseRowsWithBackground(int firstRow, int count)
+    {
+        Buffer.ClearRows(firstRow, count);
+        for (int row = firstRow; row < firstRow + count; row++)
+            EraseCellsWithBackground(row, 0, Buffer.Columns);
+    }
 
     private void EraseDisplay(int mode)
     {
@@ -567,21 +622,21 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         switch (mode)
         {
             case 0: // cursor → end of screen
-                Buffer.ClearCells(cy, cx, Buffer.Columns - cx);
-                Buffer.ClearRows(cy + 1, Buffer.Rows - cy - 1);
+                EraseCellsWithBackground(cy, cx, Buffer.Columns - cx);
+                EraseRowsWithBackground(cy + 1, Buffer.Rows - cy - 1);
                 break;
 
             case 1: // start → cursor
-                Buffer.ClearRows(0, cy);
-                Buffer.ClearCells(cy, 0, cx + 1);
+                EraseRowsWithBackground(0, cy);
+                EraseCellsWithBackground(cy, 0, cx + 1);
                 break;
 
             case 2: // whole screen
-                Buffer.ClearRows(0, Buffer.Rows);
+                EraseRowsWithBackground(0, Buffer.Rows);
                 break;
 
             case 3: // whole screen + scrollback
-                Buffer.ClearRows(0, Buffer.Rows);
+                EraseRowsWithBackground(0, Buffer.Rows);
                 break;  // scrollback cleared separately if needed (Phase 2 history API)
         }
     }
@@ -592,15 +647,15 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         switch (mode)
         {
             case 0:
-                Buffer.ClearCells(cy, cx, Buffer.Columns - cx);
+                EraseCellsWithBackground(cy, cx, Buffer.Columns - cx);
                 break;
 
             case 1:
-                Buffer.ClearCells(cy, 0, cx + 1);
+                EraseCellsWithBackground(cy, 0, cx + 1);
                 break;
 
             case 2:
-                Buffer.ClearCells(cy, 0, Buffer.Columns);
+                EraseCellsWithBackground(cy, 0, Buffer.Columns);
                 break;
         }
     }
@@ -675,6 +730,13 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
                 case 6:
                     State.Modes.OriginMode = set;
+                    CursorPositionSet(1, 1);
+                    break;
+
+                case 69:
+                    State.Modes.LeftRightMarginMode = set;
+                    if (!set)
+                        Buffer.ResetHorizontalScrollRegion();
                     break;
 
                 case 7:
@@ -820,15 +882,18 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
     private void SetScrollRegion(int top, int bottom)
     {
-        if (top == 1 && bottom == Buffer.Rows)
-            Buffer.ResetScrollRegion();
-        else
-            Buffer.SetScrollRegion(top - 1, bottom - 1);
+        Buffer.SetScrollRegion(top - 1, bottom - 1);
 
         // Setting the region homes the cursor (respecting origin mode).
-        State.CursorY = State.Modes.OriginMode ? Buffer.ScrollTop : 0;
-        State.CursorX = 0;
-        State.WrapPending = false;
+        CursorPositionSet(1, 1);
+    }
+
+    private void SetHorizontalScrollRegion(int left, int right)
+    {
+        Buffer.SetHorizontalScrollRegion(left - 1, right - 1);
+
+        // Setting the region homes the cursor (respecting origin mode).
+        CursorPositionSet(1, 1);
     }
 
     // ============== Reports ==============
@@ -843,7 +908,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
             case 6:
                 int row = State.Modes.OriginMode ? State.CursorY - Buffer.ScrollTop + 1 : State.CursorY + 1;
-                int col = State.CursorX + 1;
+                int col = State.Modes.OriginMode ? State.CursorX - Buffer.ScrollLeft + 1 : State.CursorX + 1;
                 Respond($"\x1b[{row};{col}R");
                 break;
         }

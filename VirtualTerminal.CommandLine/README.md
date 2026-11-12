@@ -5,6 +5,17 @@ It lets you host a real local command line (e.g. `cmd.exe`, PowerShell, custom C
 
 ---
 
+### Bundled console host in poldev
+
+poldev ships Microsoft.Windows.Console.ConPTY 1.25.260930003 (MIT) as
+`conpty/conpty.dll` and `conpty/OpenConsole.exe` next to the application.
+The native wrapper loads this explicit directory and uses the same module for
+creation, resize and close. A partial deployment fails instead of silently mixing
+system and bundled handles. Other consumers without that directory keep using
+the Windows system ConPTY. The Microsoft package supports Windows 10 build 17763
+and later; it avoids depending on the old Windows 10 console host for mouse input.
+New sessions use the packaged host; already open sessions keep their existing host.
+
 ## Getting started
 
 ### Reference the project

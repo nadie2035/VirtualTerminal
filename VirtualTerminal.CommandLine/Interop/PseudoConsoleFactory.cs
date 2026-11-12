@@ -21,16 +21,25 @@ public static partial class PseudoConsoleFactory
         Stream writer = Win32PipeFactory.CreateChildStdInPipe(out IntPtr hStdInput);   // Con reads from
         Stream reader = Win32PipeFactory.CreateChildStdOutPipe(out IntPtr hStdOutput); // Con writes to
 
+        IntPtr handle = IntPtr.Zero;
         try
         {
-            IntPtr handle = IntPtr.Zero;
-            int hResult = NativeMethods.CreatePseudoConsole(new COORD((ushort)buffer.GridSize.Width, (ushort)buffer.GridSize.Height), hStdInput, hStdOutput, 0, out handle);
+            int hResult = PseudoConsoleNativeApi.CreatePseudoConsole(new COORD((ushort)buffer.GridSize.Width, (ushort)buffer.GridSize.Height), hStdInput, hStdOutput, out handle);
 
+            Marshal.ThrowExceptionForHR(hResult);
             if (NativeMethods.IsInvalidHandleValue(handle))
-                throw new Win32Exception(hResult, "Failed to create ConPTY instance");
+                throw new InvalidOperationException("ConPTY returned an invalid console handle.");
 
             Win32Process process = Win32ProcessFactory.Start(processInfo, handle);
             return new PseudoConsole(handle, process, writer, reader);
+        }
+        catch
+        {
+            reader.Dispose();
+            writer.Dispose();
+            if (!NativeMethods.IsInvalidHandleValue(handle))
+                PseudoConsoleNativeApi.ClosePseudoConsole(handle);
+            throw;
         }
         finally
         {
@@ -52,9 +61,6 @@ public static partial class PseudoConsoleFactory
 
         public static bool IsInvalidHandleValue(IntPtr handle)
             => handle == IntPtr.Zero || handle == INVALID_HANDLE_VALUE;
-
-        [LibraryImport("kernel32.dll", SetLastError = true)]
-        public static partial int CreatePseudoConsole(COORD size, IntPtr hInput, IntPtr hOutput, uint dwFlags, out IntPtr phPC);
 
         [LibraryImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]

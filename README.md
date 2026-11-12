@@ -1,5 +1,23 @@
 ## VirtualTerminal
 
+### poldev fork: terminal compatibility fixes
+
+This fork retains poldev's ConPTY integration and selectively ports margin/origin
+and rectangular-scrolling changes from upstream commit
+`e33f76bcb09523109921258ffa0eafe87e2d51ac`. It does not import the entire development
+branch or change trailing CR/LF handling.
+
+Additional fixes preserve the active background for ED/EL/ECH and distinguish
+ordinary SGR from private keyboard negotiation ending in `m`. In particular,
+`CSI >4;2m` must not underline spaces. Existing SGR underline remains supported.
+
+The CommandLine backend supports a bundled `conpty/conpty.dll` and
+`conpty/OpenConsole.exe` pair, using the same native module for the complete handle
+lifecycle. See [CommandLine packaging](VirtualTerminal.CommandLine/README.md).
+Without that directory, standalone consumers keep the system ConPTY. The poldev
+parent repository owns the pinned Microsoft package, distribution license and
+isolated protocol/native regression tests.
+
 **VirtualTerminal** is a small, UI-agnostic VT/ANSI terminal engine for .NET with WPF and Avalonia controls.  
 It parses terminal escape sequences into a cross-platform screen buffer and lets you plug in different backends (local ConPTY shell, SSH, or custom sessions) through a single `ITerminalSession` abstraction.
 

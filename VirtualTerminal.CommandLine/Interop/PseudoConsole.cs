@@ -52,8 +52,7 @@ public partial class PseudoConsole : IDisposable
     /// <param name="rows">Rows.</param>
     public void Resize(ushort cols, ushort rows)
     {
-        if (NativeMethods.ResizePseudoConsole(_handle, new COORD(cols, rows)) != 0)
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "Faile to resize pseudo consoles' buffer");
+        Marshal.ThrowExceptionForHR(PseudoConsoleNativeApi.ResizePseudoConsole(_handle, new COORD(cols, rows)));
     }
 
     /// <inheritdoc />
@@ -75,7 +74,7 @@ public partial class PseudoConsole : IDisposable
 
         if (_handle != IntPtr.Zero)
         {
-            NativeMethods.ClosePseudoConsole(_handle);
+            PseudoConsoleNativeApi.ClosePseudoConsole(_handle);
             _handle = IntPtr.Zero;
         }
 
@@ -98,12 +97,4 @@ public partial class PseudoConsole : IDisposable
         }
     }
 
-    private static partial class NativeMethods
-    {
-        [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern int ResizePseudoConsole(IntPtr hPC, COORD size);
-
-        [LibraryImport("kernel32.dll", SetLastError = true)]
-        public static partial void ClosePseudoConsole(IntPtr hPC);
-    }
 }
