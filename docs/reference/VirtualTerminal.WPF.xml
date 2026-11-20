@@ -488,6 +488,13 @@
         <member name="M:VirtualTerminal.TerminalControl.ScrollToBottom">
             <summary>Snaps the viewport back to the live bottom of the buffer.</summary>
         </member>
+        <member name="M:VirtualTerminal.TerminalControl.TryCopySelectionToClipboard">
+            <summary>
+            Copies the current selection to the clipboard and reports whether there
+            was one: hosts use it to decide that Ctrl+C means "copy" instead of the
+            interrupt that closes an agent TUI session.
+            </summary>
+        </member>
         <member name="M:VirtualTerminal.TerminalControl.GetVisibleScreenText">
             <summary>Devuelve el texto de la pantalla visible (buffer principal o
             alternate), una fila por linea, leyendo bajo el lock del buffer. Lo usa el

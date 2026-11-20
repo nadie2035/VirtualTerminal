@@ -1119,13 +1119,24 @@ public partial class TerminalControl : Control, IDisposable
             ? builder.ToString().TrimEnd('\n') : null;
     }
 
-    private async Task CopySelectionToClipboardAsync()
+    /// <summary>
+    /// Copies the current selection to the clipboard and reports whether there
+    /// was one: hosts use it to decide that Ctrl+C means "copy" instead of the
+    /// interrupt that closes an agent TUI session.
+    /// </summary>
+    public bool TryCopySelectionToClipboard()
     {
         string? text = BuildSelectedText();
         if (string.IsNullOrEmpty(text))
-            return;
+            return false;
 
         Clipboard.SetText(text);
+        return true;
+    }
+
+    private async Task CopySelectionToClipboardAsync()
+    {
+        TryCopySelectionToClipboard();
         await Task.CompletedTask;
     }
 
